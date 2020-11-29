@@ -17,19 +17,12 @@ from time import time
 from numpy import matlib
 from tqdm import tqdm
 
-root_path = "/Users/jatinchinchkar/Desktop/CV/Project2/"
-face_path = root_path+"Face16/"
-non_face_path = root_path+"Nonface16/"
-
-train_face_size = 100
-train_nface_size = 100
-test_size = 100
-
-temp_face = os.listdir(face_path)
-temp_nface = os.listdir(non_face_path)
-imsize = (10,10)
 ###################### Creating the dataset for face, non face, test and train data ##############################
 def getData(path,ls,size_train,size_test):
+    """
+    This function is used to access the face-nonface images and split them into train and test split.
+    Implemented scaling on the data converted into 10x10 grey scale images and normalized into 0-1 range. 
+    """
     train_data, test_data = [],[]
     for i in tqdm(range(size_train)):
         img1 = np.array((Image.open(path+str(ls[i]))).resize(imsize,Image.BILINEAR))
@@ -42,13 +35,21 @@ def getData(path,ls,size_train,size_test):
         temp1 = img1/255
         test_data.append(temp1)
     return train_data,test_data
+
 ###################### Creating the integral images for eavery image ###########################################
 def integralImage(ls):
+    """
+    This function calculate the integral image for the image which is used for calculating the haar like features.
+    """
     for i in tqdm(range(len(ls))):
         ls[i] = ls[i].cumsum(axis=1).cumsum(axis=0)
     return ls
+
 ###################### Function to check if the feature is a possible for given image ##########################
 def possibleFeat(i,x,y,x_,y_):
+    """
+    This function is used to check if the given haar like feature is possible on the given image considering its dimenstions and type.
+    """
     featureType = [[1,2],[2,1],[1,3],[3,1],[2,2]]
     end_x = featureType[i][1]*x_
     end_y = featureType[i][0]*y_
@@ -57,8 +58,13 @@ def possibleFeat(i,x,y,x_,y_):
     else:
         possiFeat = False
     return possiFeat
+
 ###################### 5 haar like features from image ###############################
 def featureExtraction(img,i,x,y,x_,y_):
+    """
+    This function calculate all possible haar features in the image.
+    The feature strenght is calculated by calculating difference between the area for the haar features.
+    """
     featureType = [[1,2],[2,1],[1,3],[3,1],[2,2]]
     end_x = x + featureType[i][1] * x_ - 1
     end_y = y + featureType[i][0] * y_ - 1
@@ -136,8 +142,12 @@ def featureExtraction(img,i,x,y,x_,y_):
         feature = (third_area+second_area)-(first_area+fourth_area)
         
     return feature
+
 ###################### Extraction of all possibile haar like features from image ###############################    
 def getfeature(img):
+    """
+    This function traverse through entire images to calculate all haar like features.
+    """
     ls = []
     count = 0
     for i in tqdm(range(5)):
@@ -150,8 +160,13 @@ def getfeature(img):
                             ls.append([temp,i,x_,y_,x,y,count])
                             count += 1
     return ls
+
 ###################### Finding threshold value for everu haar feature ###############################
 def threshold(face,nface):
+    """ 
+    This function calculates the threshold value for every haar feature which can be used for classifying the data.
+    As for haar features we can classify the data just on the basis of the threshold.
+    """
     ls = np.concatenate((face,nface))
     min_val = ls.min()
     max_val = ls.max()
@@ -184,8 +199,13 @@ def listfeatures(ls):
             img.append(np.array(ls[i][j][0]))
         feat.append(img)  
     return feat
+
 ###################### Implementing Adaboost algorithm to get top 10 weak classifiers ###############################
 def adaboost(strong_value,face_features,nface_features,t):
+    """
+    This function calculated the haar classifier by combining 10 weak haar-features and arranging weights for every haar
+    like feature in order to achieve a strong classifier which can classify the data accurately.
+    """
     y = np.concatenate((np.ones(shape=[1,len(face_features)]),np.negative(np.ones(shape=[1,len(face_features)]))),axis=1)
     h = np.zeros(shape=[t,y.shape[1]])
     wts = np.matlib.repmat(1/y.shape[1],1,y.shape[1])
@@ -235,7 +255,8 @@ def adaboost(strong_value,face_features,nface_features,t):
         print('Training Accuracy for iteraion is',accuracy)
 
     return ht
-###################### ROC generation for model ###############################
+
+###################### Regressor for model ###############################
 def regressor_to_classifier(predictions, threshold=0.5):
     output = []
     for prediction in predictions:
@@ -245,7 +266,12 @@ def regressor_to_classifier(predictions, threshold=0.5):
             output.append(-1)
     return output
 
+###################### Confusion matrix for model ###############################
 def confusion_matrix(true, predictions):
+    """
+    This function calculate the confusion matrix by calculating True Positive, True Negative, False Positive
+    False Negative in order to check the correctness of the adaboost classifier.
+    """"
     TP = 0
     FP = 0
     TN = 0
@@ -262,7 +288,11 @@ def confusion_matrix(true, predictions):
             TN += 1
     return TP, FP, TN, FN
 
+###################### ROC generation for model ###############################
 def roc_curve(true,h_final,alphas):
+    """
+    This function plots the ROC curve for the adaboost classifier.
+    """
     x = []
     y = []
     for i in range(100):
@@ -279,9 +309,14 @@ def roc_curve(true,h_final,alphas):
     plt.xlabel("False Positive Rate")
     plt.ylabel("True Positive Rate")
     plt.title("ROC Curve")
-    plt.show()    
+    plt.show()
+    
 ###################### Extraction of all possibile haar like features from test image ###############################    
 def getReqTestFearures(ht,face_test_features,nface_test_features,t):
+    """
+    This function calculates the haar like features from the test images.
+    These generated haar like features will be further used for adaboost classifier.
+    """
     top_ten_value = np.take(ht,1,axis=1)
     req_tface_features = np.zeros(shape=[t,len(test_face)])
     req_tnface_features = np.zeros(shape=[t,len(test_face)])
@@ -291,8 +326,12 @@ def getReqTestFearures(ht,face_test_features,nface_test_features,t):
             req_tface_features[i][j] = face_test_features[j][idx][0]
             req_tnface_features[i][j] = nface_test_features[j][idx][0]
     return req_tface_features,req_tnface_features
+
 ###################### Testing the classifier on test images ###############################    
 def testModel(ht,req_tface_features,req_tnface_features):
+    """
+    This function implements the adaboost clsasifier on the test image set.
+    """
     h_final = np.zeros(shape=[t,2*test_size])
     for i in tqdm(range(t)):
         for j in range(t):
@@ -313,8 +352,12 @@ def testModel(ht,req_tface_features,req_tnface_features):
     print('Test Accuracy of the model is',accuracy_test)
     roc_curve(ytest[0].T, h_final, alphas)
     return output
+
 ###################### Fetching Threshold value for all haar like features ###############################    
 def getGetThreshold(ls_face_feat,ls_nface_feat,face_features):
+    """ 
+    This function generates the threshold calue for the the haar features.
+    """
     strong_value = []
     for j in tqdm(range(len(ls_face_feat[0]))):
         temp1 = np.take(ls_face_feat,j,axis=1)
@@ -325,8 +368,12 @@ def getGetThreshold(ls_face_feat,ls_nface_feat,face_features):
         temp = np.insert(temp_arr,1,thresh)
         strong_value.append(temp)
     return strong_value
+
 ###################### Visualization of top ten haar like features ############################### 
 def drawFeatures(img,ls):
+    """
+    This function draws the top ten weak haar classifiers on the image.
+    """
     i = int(ls[2])
     x = int(ls[5])
     y = int(ls[6])
@@ -438,4 +485,48 @@ t_stop = time()
 print('Done')
 print('execution Time',t_stop-t_start)
 
-               
+if __name__ == '__main__':
+    main()
+
+def main():
+    root_path = "/Users/jatinchinchkar/Desktop/CV/Project2/"
+    face_path = root_path+"Face16/"
+    non_face_path = root_path+"Nonface16/"
+
+    train_face_size = 1000
+    train_nface_size = 1000
+    test_size = 100
+
+    temp_face = os.listdir(face_path)
+    temp_nface = os.listdir(non_face_path)
+    imsize = (10,10)
+    
+    print('start')     
+    t = 10
+    t_start = time()   
+    train_face_data,test_face_data = getData(face_path, temp_face, train_face_size, test_size)
+    train_nface_data,test_nface_data = getData(non_face_path, temp_nface, train_nface_size, test_size)
+    train_face = integralImage(train_face_data)
+    train_nface = integralImage(train_nface_data)
+    test_face = integralImage(test_face_data)
+    test_nface = integralImage(test_nface_data)
+    face_features = getFeat(train_face)
+    nface_features = getFeat(train_nface)
+    face_test_features = getFeat(test_face)
+    nface_test_features = getFeat(test_nface)
+    ls_face_feat = listfeatures(face_features)
+    ls_nface_feat = listfeatures(nface_features)
+    ls_face_feat = np.array(ls_face_feat)
+    ls_nface_feat = np.array(ls_nface_feat)
+    strong_value = getGetThreshold(ls_face_feat, ls_nface_feat, face_features)
+    face_features = getFeat(train_face)
+    ls_face_feat = listfeatures(face_features)
+    strong_value = np.array(strong_value)
+    print('threshold calculated')
+    ht = adaboost(strong_value, face_features, nface_features, t)
+    req_tface_features,req_tnface_features = getReqTestFearures(ht, face_test_features, nface_test_features, t)
+    output = testModel(ht, req_tface_features, req_tnface_features)
+    visualizeHar(ht, strong_value, t)
+    t_stop = time()
+    print('Done')
+    print('execution Time',t_stop-t_start)
